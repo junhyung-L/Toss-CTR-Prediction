@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torch.cuda.amp import autocast, GradScaler
 
 from data import CTRDataset
-from models import DCN_DIN_Model
+from models import DCN_SEQ_Model
 
 warnings.filterwarnings("ignore")
 
@@ -111,12 +111,13 @@ def main(args):
     dl_te = DataLoader(ds_te, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=args.pin_memory)
 
     # Model
-    print("[3/7] Building model...")
-    model = DCN_DIN_Model(
+    print(f"[3/7] Building model with backbone={args.seq_backbone}...")
+    bst_cfg = {"nhead": args.bst_nhead, "num_layers": args.bst_layers, "dim_ff": args.bst_ffn}
+    model = DCN_SEQ_Model(
         cont_dim=len(cont_cols), cat_cards=cat_cards, seq_vocab_size=seq_vocab_size,
-        target_name=target_name, seq_emb_dim=args.seq_emb_dim,
-        deep_units=args.deep_units, cross_layers=args.cross_layers,
-        cross_low_rank=args.cross_low_rank, cross_num_experts=args.cross_num_experts,
+        target_name=target_name, seq_emb_dim=args.seq_emb_dim, seq_backbone=args.seq_backbone,
+        bst_cfg=bst_cfg, deep_units=args.deep_units,
+        cross_layers=args.cross_layers, cross_low_rank=args.cross_low_rank, cross_num_experts=args.cross_num_experts,
         dropout=args.dropout
     ).to(device)
 
@@ -216,7 +217,9 @@ def main(args):
             "seq_emb_dim": args.seq_emb_dim, "dropout": args.dropout,
             "epochs": args.epochs, "batch_size": args.batch_size, "lr": args.lr,
             "cross_layers": args.cross_layers, "cross_low_rank": args.cross_low_rank, "cross_num_experts": args.cross_num_experts,
-            "deep_units": args.deep_units
+            "deep_units": args.deep_units,
+            "seq_backbone": args.seq_backbone,
+            "bst_layers": args.bst_layers, "bst_nhead": args.bst_nhead, "bst_ffn": args.bst_ffn
         },
         "performance": {"best_epoch": int(final_epoch), "AUC": float(best_auc), "PR_AUC": float(final_prauc)},
         "target_name": target_name
@@ -230,8 +233,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CTR Prediction Training Pipeline")
     parser.add_argument("--train_path", type=str, default="../train.parquet")
     parser.add_argument("--test_path", type=str, default="../test.parquet")
-    parser.add_argument("--output_path", type=str, default="./submit_dcn_din.csv")
-    parser.add_argument("--meta_path", type=str, default="./meta_dcn_din.json")
+    parser.add_argument("--output_path", type=str, default="./submit_dcn_seq.csv")
+    parser.add_argument("--meta_path", type=str, default="./meta_dcn_seq.json")
     parser.add_argument("--label_col", type=str, default="clicked")
     parser.add_argument("--seq_col", type=str, default="seq")
     parser.add_argument("--id_col", type=str, default="ID")
@@ -254,6 +257,13 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--pin_memory", action="store_true")
+    
+    # New arguments for sequence backbones
+    parser.add_argument("--seq_backbone", type=str, default="din", choices=["din", "dien", "bst"],
+                        help="Sequence backbone architecture")
+    parser.add_argument("--bst_layers", type=int, default=2, help="Number of Transformer layers for BST")
+    parser.add_argument("--bst_nhead", type=int, default=4, help="Number of heads for BST")
+    parser.add_argument("--bst_ffn", type=int, default=128, help="Hidden dim of FFN in BST")
     
     args = parser.parse_args()
     main(args)

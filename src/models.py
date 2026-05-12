@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 PAD_ID = 0
 
@@ -59,9 +60,105 @@ class DINActivationUnit(nn.Module):
         w = self.net(z).squeeze(2)                    # (B,L)
         return w
 
-class DCN_DIN_Model(nn.Module):
+# =============== Sequence Backbones ===============
+
+class DINBackbone(nn.Module):
+    """Standard DIN Backbone (Attention over embeddings)"""
+    def __init__(self, vocab_size, emb_dim, padding_idx=0, dropout=0.2):
+        super().__init__()
+        self.emb = nn.Embedding(vocab_size, emb_dim, padding_idx=padding_idx)
+        self.att = DINActivationUnit(emb_dim, emb_dim, hidden=[64, 32], dropout=dropout)
+        
+    def forward(self, seq_ids, q_vec):
+        K = self.emb(seq_ids)                 # (B,L,D)
+        logits_w = self.att(q_vec, K)          # (B,L)
+        maskL = (seq_ids != PAD_ID)
+        neg = torch.finfo(logits_w.dtype).min
+        logits_w = logits_w.masked_fill(~maskL, neg)
+        valid = maskL.any(dim=1, keepdim=True)
+        maxv = torch.where(valid,
+                           logits_w.max(dim=1, keepdim=True).values,
+                           torch.zeros_like(logits_w[:, :1]))
+        logits_w = torch.where(valid, logits_w - maxv, torch.zeros_like(logits_w))
+        alpha = torch.where(valid, torch.softmax(logits_w, dim=1), torch.zeros_like(logits_w))
+        alpha = torch.nan_to_num(alpha, nan=0.0)
+        interest = torch.sum(K * alpha.unsqueeze(2), dim=1)   # (B,D)
+        return interest
+
+class DIENBackbone(nn.Module):
+    """DIEN Backbone (GRU + Attention over hidden states)"""
+    def __init__(self, vocab_size, emb_dim, padding_idx=0, dropout=0.2):
+        super().__init__()
+        self.emb = nn.Embedding(vocab_size, emb_dim, padding_idx=padding_idx)
+        self.gru = nn.GRU(input_size=emb_dim, hidden_size=emb_dim, batch_first=True)
+        self.att = DINActivationUnit(emb_dim, emb_dim, hidden=[64, 32], dropout=dropout)
+        
+    def forward(self, seq_ids, q_vec):
+        K0 = self.emb(seq_ids)                 # (B,L,D)
+        H, _ = self.gru(K0)                    # (B,L,D)
+        logits_w = self.att(q_vec, H)          # (B,L)
+        maskL = (seq_ids != PAD_ID)
+        neg = torch.finfo(logits_w.dtype).min
+        logits_w = logits_w.masked_fill(~maskL, neg)
+        valid = maskL.any(dim=1, keepdim=True)
+        maxv = torch.where(valid,
+                           logits_w.max(dim=1, keepdim=True).values,
+                           torch.zeros_like(logits_w[:, :1]))
+        logits_w = torch.where(valid, logits_w - maxv, torch.zeros_like(logits_w))
+        alpha = torch.where(valid, torch.softmax(logits_w, dim=1), torch.zeros_like(logits_w))
+        alpha = torch.nan_to_num(alpha, nan=0.0)
+        interest = torch.sum(H * alpha.unsqueeze(2), dim=1)   # (B,D)
+        return interest
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=1024):
+        super().__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-np.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe.unsqueeze(0))  # (1,max_len,d)
+        
+    def forward(self, x):
+        L = x.size(1)
+        return x + self.pe[:, :L, :]
+
+class BSTBackbone(nn.Module):
+    """BST Backbone (Transformer Encoder + Attention)"""
+    def __init__(self, vocab_size, emb_dim, nhead=4, num_layers=2, dim_ff=128, dropout=0.2, padding_idx=0):
+        super().__init__()
+        self.emb = nn.Embedding(vocab_size, emb_dim, padding_idx=padding_idx)
+        self.pos = PositionalEncoding(emb_dim, max_len=2048)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim, nhead=nhead, dim_feedforward=dim_ff,
+                                                   batch_first=True, dropout=dropout, activation="relu", norm_first=True)
+        self.enc = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.att = DINActivationUnit(emb_dim, emb_dim, hidden=[64, 32], dropout=dropout)
+        
+    def forward(self, seq_ids, q_vec):
+        K0 = self.emb(seq_ids)                 # (B,L,D)
+        K0 = self.pos(K0)
+        key_pad_mask = (seq_ids == PAD_ID)     # True for PAD (B,L)
+        H = self.enc(K0, src_key_padding_mask=key_pad_mask)  # (B,L,D)
+        logits_w = self.att(q_vec, H)          # (B,L)
+        neg = torch.finfo(logits_w.dtype).min
+        logits_w = logits_w.masked_fill(key_pad_mask, neg)
+        valid = (~key_pad_mask).any(dim=1, keepdim=True)
+        maxv = torch.where(valid,
+                           logits_w.max(dim=1, keepdim=True).values,
+                           torch.zeros_like(logits_w[:, :1]))
+        logits_w = torch.where(valid, logits_w - maxv, torch.zeros_like(logits_w))
+        alpha = torch.where(valid, torch.softmax(logits_w, dim=1), torch.zeros_like(logits_w))
+        alpha = torch.nan_to_num(alpha, nan=0.0)
+        interest = torch.sum(H * alpha.unsqueeze(2), dim=1)   # (B,D)
+        return interest
+
+# =============== Unified Model ===============
+
+class DCN_SEQ_Model(nn.Module):
     def __init__(self, cont_dim, cat_cards, seq_vocab_size, target_name=None,
-                 seq_emb_dim=64, deep_units=[512, 256, 128],
+                 seq_emb_dim=64, seq_backbone="din",
+                 bst_cfg=None, deep_units=[512, 256, 128],
                  cross_layers=3, cross_low_rank=32, cross_num_experts=4, dropout=0.2):
         super().__init__()
         self.has_cont = cont_dim > 0
@@ -90,15 +187,25 @@ class DCN_DIN_Model(nn.Module):
             in_dim = h
         self.deep = nn.Sequential(*deep_layers)
 
-        # Sequence + DIN(activation unit)
-        self.seq_emb = nn.Embedding(seq_vocab_size, seq_emb_dim, padding_idx=PAD_ID)
+        # Query(target) 임베딩
         self.target_name = target_name if (target_name in self.cat_embs) else None
         if self.target_name is not None:
             tdim = self.cat_embs[self.target_name].embedding_dim
         else:
             tdim = seq_emb_dim
         self.proj_t = nn.Linear(tdim, seq_emb_dim, bias=False) if tdim != seq_emb_dim else nn.Identity()
-        self.din_act = DINActivationUnit(seq_emb_dim, seq_emb_dim, hidden=[64, 32], dropout=dropout)
+
+        # Sequence backbone
+        self.seq_backbone = seq_backbone
+        if seq_backbone == "bst":
+            cfg = bst_cfg or {"nhead": 4, "num_layers": 2, "dim_ff": 128}
+            self.seq_enc = BSTBackbone(seq_vocab_size, seq_emb_dim,
+                                       nhead=cfg["nhead"], num_layers=cfg["num_layers"], dim_ff=cfg["dim_ff"],
+                                       dropout=dropout, padding_idx=PAD_ID)
+        elif seq_backbone == "dien":
+            self.seq_enc = DIENBackbone(seq_vocab_size, seq_emb_dim, padding_idx=PAD_ID, dropout=dropout)
+        else: # "din" fallback
+            self.seq_enc = DINBackbone(seq_vocab_size, seq_emb_dim, padding_idx=PAD_ID, dropout=dropout)
 
         # Final head: [cross_out, deep_out, interest_vec]
         final_in = self.tab_dim + deep_units[-1] + seq_emb_dim
@@ -120,34 +227,32 @@ class DCN_DIN_Model(nn.Module):
         x_cross = self.cross(x0)                                  # (B, tab_dim)
         x_deep = self.deep(x0)                                   # (B, deep_dim)
 
-        # ----- DIN -----
-        K = self.seq_emb(seq_ids)                                 # (B,L,D)
+        # Query(target) vector
         if self.target_name is not None:
             q = self.cat_embs[self.target_name](xcats[self.target_name])  # (B,Dt)
             q = self.proj_t(q)                                    # (B,D)
         else:
-            mask = (seq_ids != PAD_ID).float().unsqueeze(-1)
-            q = (K * mask).sum(dim=1) / (mask.sum(dim=1) + 1e-8)        # mean fallback
+            # Fallback: zero vector or mean would be handled in backbone if needed, 
+            # here we pass zero vector as query if no target_name is available
+            q = torch.zeros(seq_ids.size(0), self.proj_t.out_features if hasattr(self.proj_t, 'out_features') else seq_ids.size(-1), device=seq_ids.device)
 
-        # Activation unit -> attention logits
-        logits_w = self.din_act(q, K)                             # (B,L)
-        maskL = (seq_ids != PAD_ID)
-
-        # fp16에서도 안전한 음수값으로 PAD 마스킹
-        neg = torch.finfo(logits_w.dtype).min
-        logits_w = logits_w.masked_fill(~maskL, neg)
-
-        # 전부 PAD인 행 안전 처리 (alpha=0)
-        valid = maskL.any(dim=1, keepdim=True)                    # (B,1)
-        maxv = torch.where(valid,
-                           logits_w.max(dim=1, keepdim=True).values,
-                           torch.zeros_like(logits_w[:, :1]))
-        logits_w = torch.where(valid, logits_w - maxv, torch.zeros_like(logits_w))
-        alpha = torch.where(valid, torch.softmax(logits_w, dim=1), torch.zeros_like(logits_w))
-        alpha = torch.nan_to_num(alpha, nan=0.0)
-
-        interest = torch.sum(K * alpha.unsqueeze(2), dim=1)       # (B,D)
+        # Sequence → interest vector
+        interest = self.seq_enc(seq_ids, q)                        # (B,D)
 
         # 출력 결합
         z = torch.cat([x_cross, x_deep, interest], dim=1)
         return self.head(z).squeeze(1)
+
+# Keep old model for backward compatibility or direct use
+class DCN_DIN_Model(nn.Module):
+    def __init__(self, cont_dim, cat_cards, seq_vocab_size, target_name=None,
+                 seq_emb_dim=64, deep_units=[512, 256, 128],
+                 cross_layers=3, cross_low_rank=32, cross_num_experts=4, dropout=0.2):
+        super().__init__()
+        self.base_model = DCN_SEQ_Model(cont_dim, cat_cards, seq_vocab_size, target_name,
+                                         seq_emb_dim, seq_backbone="din",
+                                         deep_units=deep_units, cross_layers=cross_layers,
+                                         cross_low_rank=cross_low_rank, cross_num_experts=cross_num_experts,
+                                         dropout=dropout)
+    def forward(self, xc, xcats, seq_ids):
+        return self.base_model(xc, xcats, seq_ids)
