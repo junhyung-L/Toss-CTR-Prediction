@@ -1,0 +1,14 @@
+# Data files
+*.parquet
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
