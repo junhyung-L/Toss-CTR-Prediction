@@ -30,28 +30,34 @@ To capture both cross-feature interactions and the evolution of user interests, 
 
 ```mermaid
 graph TD
-    A[Input Features] --> B[Continuous Features]
-    A --> C[Categorical Features]
-    A --> D[User Behavior Sequence]
+    subgraph Input_Features [1. Multi-Modal Inputs]
+        A[User Profile <br> 유저 기본 정보]
+        B[Ad Features <br> 광고 속성]
+        C[Historical Sequences <br> 유저 행동 시퀀스]
+    end
+
+    subgraph Feature_Processing [2. Embedding & Sequence Modeling]
+        D[Hash Embedding <br> 고차원 범주형 처리]
+        E[Sequence Backbone <br> DIN / DIEN / BST]
+        F[Attention Mechanism <br> 동적 관심도 추출]
+    end
+
+    subgraph Deep_Learning_Tower [3. Advanced Architecture]
+        G[DCN-V2 CrossNetMix <br> 명시적 피처 교차]
+        H[Deep MLP Tower <br> 비선형 관계 학습]
+    end
+
+    A & B --> D
+    C --> E
+    E --> F
+    D & F --> G
+    D & F --> H
     
-    B --> E[BatchNorm1d]
-    C --> F[Embedding Lookup]
-    D --> G[Hash Embedding <br> 2^18 Buckets]
-    
-    E --> H[Unified Tabular Vector]
-    F --> H
-    
-    H --> I[DCN-V2 <br> CrossNetMix]
-    H --> J[Deep Tower <br> 512-256-128]
-    
-    G --> K[DIN Attention <br> Target x History]
-    
-    I --> L[Concatenation]
-    J --> L
-    K --> L
-    
-    L --> M[Prediction Head]
-    M --> N[CTR Output]
+    G & H --> I[CTR Prediction Head <br> 클릭 확률 예측]
+
+    style Input_Features fill:#f9f,stroke:#333,stroke-width:2px
+    style Feature_Processing fill:#bbf,stroke:#333,stroke-width:2px
+    style Deep_Learning_Tower fill:#bfb,stroke:#333,stroke-width:2px
 ```
 
 ---
