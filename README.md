@@ -56,19 +56,21 @@ graph TD
 
 ---
 
-## 🤖 3. Deep Dive: Modeling Details (모델링 디테일)
-To solve the problem, we implemented advanced deep learning techniques to handle both feature interactions and sequence modeling.
+## 🛠️ Methodologies & Advanced Architectures (방법론 및 고급 아키텍처)
 
-### 🧠 A. DCN-V2 (CrossNetMix)
-Instead of standard feature crosses, which explode in memory with high-dimensional data, we implemented the memory-efficient **CrossNetMix** using Einstein summation (`torch.einsum`):
-- **Mechanism**: Low-rank approximation (`rank=32`) with 4 experts to model complex non-linear feature interactions without memory explosion.
+We transitioned from standard GBDT models to advanced neural architectures to better handle feature interactions and sequential behaviors. The repository now supports a unified **DCN-V2 (Deep & Cross Network v2)** body with multiple sequence backbones:
 
-### 📍 B. DIN (Deep Interest Network) with Custom Activation
-To model the user's dynamic interests relative to the target ad (e.g., a user who likes finance might click a loan ad but ignore a game ad):
-- **Local Activation Unit**: Calculates attention weights between the target ad and historical ad behaviors.
-- **Features for Attention**: `[q, k_i, q - k_i, q * k_i]` fed into a sub-MLP to learn non-linear relationships.
+### 1. Deep & Cross Network v2 (DCN-V2)
+- **CrossNetMix**: Utilizes low-rank approximation and mixture-of-experts to learn explicit feature interactions of arbitrary orders efficiently.
+- Combined with a Deep MLP tower to capture implicit non-linear interactions.
 
-### ⚙️ C. Big Data Scale & Optimization
+### 2. Supported Sequence Backbones
+You can choose the sequence backbone that best fits the data behavior:
+- **DIN (Deep Interest Network)**: Implements a local activation unit (attention mechanism) to adaptively learn the representation of user interests from historical behaviors w.r.t. a specific candidate ad.
+- **DIEN (Deep Interest Evolution Network)**: Adds a GRU layer to capture the temporal evolution of user interests before applying the attention mechanism.
+- **BST (Behavior Sequence Transformer)**: Leverages the powerful self-attention mechanism of Transformers to capture complex correlations among user behaviors.
+
+### ⚙️ Big Data Scale & Optimization (빅데이터 스케일 및 최적화)
 - **Hash Embedding**: Used a fixed bucket size of **262,144** for sequence items to prevent Out-Of-Memory (OOM) errors caused by high cardinality.
 - **Imbalance Handling**: Used `BCEWithLogitsLoss` with a calculated `pos_weight` of ~51.4 to force the model to learn from the rare positive click events.
 
