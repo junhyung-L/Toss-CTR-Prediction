@@ -4,12 +4,12 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![Status](https://img.shields.io/badge/Status-Completed-success.svg)]()
 
-## 🚀 Executive Summary (TL;DR)
+## 🚀 Executive Summary (TL;DR) (실행 요약)
 - **The Problem**: Predict Ad Click-Through Rate (CTR) for Toss app users, handling extreme class imbalance (pos_weight ~51.4), massive sequence data, and memory constraints.
 - **The Solution**: Developed an advanced hybrid deep learning model combining **DCN-V2 (CrossNetMix)** for explicit feature interactions and **DIN (Deep Interest Network)** with a custom activation unit for user behavior sequence modeling.
 - **The Result**: Achieved a validation AUC of **0.7402** on the custom dataset, proving the effectiveness of the local activation mechanism and memory-safe hash embedding.
 
-## 🛠 Tech Stack
+## 🛠 Tech Stack (기술 스택)
 - **Framework**: PyTorch 2.x
 - **Modeling**: DCN-V2 + DIN (Custom Hybrid)
 - **Sequence Processing**: Hash Embedding (262,144 buckets)
@@ -17,7 +17,7 @@
 
 ---
 
-## 🔬 1. Problem Definition
+## 🔬 1. Problem Definition (문제 정의)
 Predicting whether a user will click on an advertisement (Click-Through Rate or CTR) is the core engine of digital marketing, directly impacting revenue and user experience.
 - **The Challenge**: Predict Ad CTR for Toss app users.
 - **The Complications**: Extreme class imbalance (very few users click on ads compared to those who don't), massive sequence data representing user behavior, and strict memory constraints for production deployment.
@@ -25,7 +25,7 @@ Predicting whether a user will click on an advertisement (Click-Through Rate or 
 
 ---
 
-## 🛠️ 2. System Architecture: DCN-V2 + DIN
+## 🛠️ 2. System Architecture: DCN-V2 + DIN (시스템 아키텍처)
 To capture both cross-feature interactions and the evolution of user interests, we fused two state-of-the-art architectures. This hybrid approach ensures we model both static user profiles and dynamic behavior.
 
 ```mermaid
@@ -56,7 +56,7 @@ graph TD
 
 ---
 
-## 🤖 3. Deep Dive: Modeling Details
+## 🤖 3. Deep Dive: Modeling Details (모델링 디테일)
 To solve the problem, we implemented advanced deep learning techniques to handle both feature interactions and sequence modeling.
 
 ### 🧠 A. DCN-V2 (CrossNetMix)
@@ -79,7 +79,7 @@ We prototyped and evaluated several state-of-the-art CTR models to find the best
 
 ---
 
-## 🏁 4. Conclusion & Business Impact
+## 🏁 4. Conclusion & Business Impact (결론 및 비즈니스 임팩트)
 The project successfully demonstrated how to build a production-ready CTR model under extreme constraints.
 - **Outcome**: Achieved a validation AUC of **0.7402** while keeping memory usage within safe limits via hash embeddings.
 - **Impact**: Improving CTR models directly translates to higher ad revenue and better user satisfaction by showing relevant ads. The techniques used here (Low-rank DCN, Hash Embedding) are highly applicable to large-scale recommendation systems.
@@ -114,4 +114,4 @@ The project successfully demonstrated how to build a production-ready CTR model 
 - **Junhyung L.** (Project Lead)
 
 ---
-*Refactored and polished to meet professional software engineering standards for the [Data Analyst Portfolio](https://github.com/junhyung-L).*
+*Refactored and polished to meet professional software engineering standards for the [Data Analyst Portfolio](https://github.com/junhyung-L/Resume/blob/main/Portfolio/README.md).*
