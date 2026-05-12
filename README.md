@@ -9,6 +9,12 @@
 - **The Solution**: Developed an advanced hybrid deep learning model combining **DCN-V2 (CrossNetMix)** for explicit feature interactions and **DIN (Deep Interest Network)** with a custom activation unit for user behavior sequence modeling.
 - **The Result**: Achieved a validation AUC of **0.7402** on the custom dataset, proving the effectiveness of the local activation mechanism and memory-safe hash embedding.
 
+## 💡 Business Impact & Value (비즈니스 임팩트 및 가치)
+In financial super-apps like Toss, precise CTR prediction is directly linked to **revenue optimization** and **user experience**:
+- **Revenue Growth**: A precise CTR model maximizes ad revenue by ensuring that high-value ads are shown to users with the highest probability of clicking.
+- **User Experience**: By recommending ads that align with the user's dynamic interests (captured by DIN), we minimize ad fatigue and maintain high engagement within the financial ecosystem.
+- **Cost Efficiency**: The proposed memory-efficient architecture (Hash Embedding + DCN-V2) ensures that the model can handle massive traffic without exploding cloud infrastructure costs.
+
 ## 🛠 Tech Stack (기술 스택)
 - **Framework**: PyTorch 2.x
 - **Modeling**: DCN-V2 + DIN (Custom Hybrid)
