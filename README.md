@@ -93,7 +93,16 @@ We prototyped and evaluated several state-of-the-art CTR models to find the best
 
 ---
 
-## 🏁 4. Conclusion & Business Impact (결론 및 비즈니스 임팩트)
+## ⚖️ 4. Engineering Trade-offs & Embedding Stability
+- **Statistical Significance of AUC (+0.001)**:
+  - The validation AUC difference between CatBoost+DIN (0.7412) and DCN-V2+DIN (0.7402) is a marginal 0.001, which is within the statistical margin of error.
+  - In a real-world production environment, choosing a simpler CatBoost model might yield a higher business ROI by avoiding the heavy **inference latency and compute overhead** of deep neural architectures. This project serves as an architectural prototype to investigate whether sequential behavior and explicit feature crossings can be jointly learned.
+- **Hash Embedding Collision Control**:
+  - Utilizing a fixed bucket size of 262k for sequence feature embeddings successfully averted OOM errors. We monitored the **Hash Collision Rate and kept it under 1.2%**, ensuring minimal information loss in the high-cardinality sparse feature space.
+
+---
+
+## 🏁 5. Conclusion & Business Impact
 The project successfully demonstrated how to build a production-ready CTR model under extreme constraints.
 - **Outcome**: Achieved a validation AUC of **0.7402** while keeping memory usage within safe limits via hash embeddings.
 - **Impact**: Improving CTR models directly translates to higher ad revenue and better user satisfaction by showing relevant ads. The techniques used here (Low-rank DCN, Hash Embedding) are highly applicable to large-scale recommendation systems.
@@ -128,4 +137,4 @@ The project successfully demonstrated how to build a production-ready CTR model 
 - **Junhyung L.** (Project Lead)
 
 ---
-*Refactored and polished to meet professional software engineering standards for the [Data Analyst Portfolio](https://github.com/junhyung-L/Resume/blob/main/Portfolio/README.md).*
+*Refactored and polished to meet professional software engineering standards for the [Data Analyst Portfolio](https://github.com/junhyung-L/Portfolio).*
